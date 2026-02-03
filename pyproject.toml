@@ -1,0 +1,41 @@
+[project]
+name = "comfyui-djz-offsquare"
+version = "1.0.0"
+description = "ComfyUI custom node that creates optimized image collages from batches of 2-6 images"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Drift Johnson"}
+]
+keywords = ["comfyui", "image", "collage", "compositing", "stable-diffusion"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
+    "Pillow>=9.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/MushroomFleet/ComfyUI-DJZ-Offsquare"
+Repository = "https://github.com/MushroomFleet/ComfyUI-DJZ-Offsquare"
+Issues = "https://github.com/MushroomFleet/ComfyUI-DJZ-Offsquare/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["comfyui_djz_offsquare"]
