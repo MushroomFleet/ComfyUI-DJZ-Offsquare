@@ -41,7 +41,6 @@ The node will appear under: **image/compositing → DJZ Offsquare Collage**
 |-------|------|-------------|
 | `images` | IMAGE | Batch of 2-6 images |
 | `aspect_ratio` | Dropdown | Output aspect ratio (default: 1:1) |
-| `layout_style` | Dropdown | Layout strategy or "auto" |
 | `border_radius` | INT (0-64) | Corner radius for image regions |
 | `background_color` | STRING | Hex color for canvas background |
 
@@ -52,32 +51,17 @@ The node will appear under: **image/compositing → DJZ Offsquare Collage**
 | `image` | IMAGE | The generated collage |
 | `layout_info` | STRING | Layout details (type, dimensions, etc.) |
 
-## Layout Styles
+## Automatic Layout Selection
 
-### 2 Images
-- `diagonal` — Overlapping diagonal composition
-- `vsplit` — Vertical split
-- `hsplit` — Horizontal split
+The node automatically selects the best layout based on your images' aspect ratios. Available layouts per image count:
 
-### 3 Images
-- `cascade` — Full-width top + two bottom
-- `l-shape` — Large corner + two edges
-- `reverse-l` — Tall left column + two right
-
-### 4 Images
-- `grid` — 2×2 with bottom-right emphasis
-- `dominant-three` — Large left + three stacked right
-- `t-layout` — Wide top + three bottom
-
-### 5 Images
-- `quincunx` — Four corners + small center
-- `asymmetric` — Varied sizes with center accent
-- `l-shape` — Large corner + four edges
-
-### 6 Images
-- `grid-2x3` — 2×3 grid with spill
-- `grid-3x2` — 3×2 grid with spill
-- `feature-corner` — Large corner + five tiles
+| Images | Available Layouts |
+|--------|-------------------|
+| 2 | diagonal, vsplit, hsplit |
+| 3 | cascade, l-shape, reverse-l |
+| 4 | grid, dominant-three, t-layout |
+| 5 | quincunx, asymmetric, l-shape |
+| 6 | grid-2x3, grid-3x2, feature-corner |
 
 ## Aspect Ratios & Dimensions
 
@@ -97,11 +81,9 @@ All ratios maintain ~4,194,304 total pixels:
 
 1. **Image Order Matters** — First image in batch goes to top-left (background), last image goes to bottom-right (foreground with spill)
 
-2. **Use Auto Layout** — Let the algorithm pick the best layout based on your images' aspect ratios
+2. **Batch Creation** — Use a "Batch Images" node to combine individual images before connecting to this node
 
-3. **Batch Creation** — Use a "Batch Images" node to combine individual images before connecting to this node
-
-4. **Chain with Save** — Connect output directly to "Save Image" node for export
+3. **Chain with Save** — Connect output directly to "Save Image" node for export
 
 ## Example Workflow
 

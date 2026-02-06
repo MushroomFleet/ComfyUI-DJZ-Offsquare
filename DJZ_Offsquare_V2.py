@@ -1,11 +1,11 @@
 """
-DJZ_Offsquare - ComfyUI Custom Node
+DJZ_Offsquare_V2 - ComfyUI Custom Node
 Creates optimized image collages from batches of 2-6 images.
 
 Features:
 - Multiple layout strategies per image count
 - Aspect ratio selection (1:1, 16:9, 9:16, 3:2, 2:3, 4:3, 3:4)
-- Maintains ~4 megapixels output (same as 2048x2048)
+- Customizable canvas total pixels (default 3072x3072)
 - First image → top-left (bottom z-order)
 - Last image → bottom-right with spill effect (top z-order)
 - Aspect-ratio aware image placement
@@ -175,9 +175,6 @@ LAYOUT_STRATEGIES = {
 # ASPECT RATIO DEFINITIONS
 # =============================================================================
 
-# Target megapixels (2048 * 2048 = 4,194,304)
-TARGET_MEGAPIXELS = 2048 * 2048
-
 ASPECT_RATIOS = {
     "1:1": 1.0,
     "16:9": 16.0 / 9.0,
@@ -192,12 +189,13 @@ ASPECT_RATIOS = {
 # HELPER FUNCTIONS
 # =============================================================================
 
-def calculate_dimensions(aspect_ratio: float) -> tuple:
+def calculate_dimensions(aspect_ratio: float, canvas_total_pixels: int) -> tuple:
     """
     Calculate canvas dimensions for a given aspect ratio
-    while maintaining the same total pixel count as 2048x2048.
+    while maintaining the specified total pixel count.
     """
-    height = int(math.sqrt(TARGET_MEGAPIXELS / aspect_ratio))
+    target_megapixels = canvas_total_pixels * canvas_total_pixels
+    height = int(math.sqrt(target_megapixels / aspect_ratio))
     width = int(height * aspect_ratio)
     return width, height
 
@@ -209,7 +207,7 @@ def calculate_fill_scale(img_width: int, img_height: int, region_width: int, reg
     """
     img_aspect = img_width / img_height
     region_aspect = region_width / region_height
-    
+
     if img_aspect > region_aspect:
         # Image is wider - scale by height
         return region_height / img_height
@@ -223,24 +221,24 @@ def score_layout(layout: dict, image_dimensions: list) -> float:
     Score a layout based on how well images fit their regions.
     """
     total_score = 0.0
-    
+
     for i, region in enumerate(layout["regions"]):
         if i >= len(image_dimensions):
             continue
-        
+
         img_w, img_h = image_dimensions[i]
         img_aspect = img_w / img_h
         region_aspect = region["w"] / region["h"]
-        
+
         # Score based on aspect ratio match (less clipping = better)
         aspect_diff = abs(img_aspect - region_aspect)
         aspect_score = 1.0 / (1.0 + aspect_diff)
-        
+
         # Bonus for larger regions (prioritizes screen real estate)
         size_score = region["w"] * region["h"]
-        
+
         total_score += aspect_score * 0.7 + size_score * 0.3
-    
+
     return total_score
 
 
@@ -252,40 +250,40 @@ def apply_layout_rules(regions: list, image_count: int) -> list:
     """
     if len(regions) < 2:
         return regions
-    
+
     # Clone regions
     adjusted = [dict(r) for r in regions]
-    
+
     # Find top-left region (smallest x+y)
     top_left_idx = 0
     min_top_left = adjusted[0]["x"] + adjusted[0]["y"]
-    
+
     # Find bottom-right region (largest extent)
     bottom_right_idx = len(adjusted) - 1
     max_bottom_right = 0
-    
+
     for i, r in enumerate(adjusted):
         top_left_score = r["x"] + r["y"]
         bottom_right_score = (r["x"] + r["w"]) + (r["y"] + r["h"])
-        
+
         if top_left_score < min_top_left:
             min_top_left = top_left_score
             top_left_idx = i
-        
+
         if bottom_right_score > max_bottom_right:
             max_bottom_right = bottom_right_score
             bottom_right_idx = i
-    
+
     # Assign z-orders
     adjusted[top_left_idx]["z"] = 1
     adjusted[bottom_right_idx]["z"] = image_count
-    
+
     z_counter = 2
     for i, r in enumerate(adjusted):
         if i != top_left_idx and i != bottom_right_idx:
             r["z"] = z_counter
             z_counter += 1
-    
+
     return adjusted
 
 
@@ -319,48 +317,48 @@ def optimize_image_order(image_dimensions: list, regions: list) -> list:
     """
     if len(image_dimensions) < 2:
         return list(range(len(image_dimensions)))
-    
+
     # Find top-left and bottom-right regions
     top_left_region_idx = 0
     bottom_right_region_idx = len(regions) - 1
     min_top_left = regions[0]["x"] + regions[0]["y"]
     max_bottom_right = 0
-    
+
     for i, r in enumerate(regions):
         top_left_score = r["x"] + r["y"]
         bottom_right_score = (r["x"] + r["w"]) + (r["y"] + r["h"])
-        
+
         if top_left_score < min_top_left:
             min_top_left = top_left_score
             top_left_region_idx = i
-        
+
         if bottom_right_score > max_bottom_right:
             max_bottom_right = bottom_right_score
             bottom_right_region_idx = i
-    
+
     result = [-1] * len(regions)
     used_images = set()
-    
+
     # Rule 1: First image (index 0) goes to top-left region
     result[top_left_region_idx] = 0
     used_images.add(0)
-    
+
     # Rule 2: Last image goes to bottom-right region
     last_image_idx = len(image_dimensions) - 1
     result[bottom_right_region_idx] = last_image_idx
     used_images.add(last_image_idx)
-    
+
     # For remaining regions, use aspect ratio matching
     remaining_regions = [
         (i, regions[i]) for i in range(len(regions))
         if i != top_left_region_idx and i != bottom_right_region_idx
     ]
-    
+
     for region_idx, region in remaining_regions:
         best_img_idx = -1
         best_diff = float("inf")
         region_aspect = region["w"] / region["h"]
-        
+
         for img_idx, (img_w, img_h) in enumerate(image_dimensions):
             if img_idx in used_images:
                 continue
@@ -369,11 +367,11 @@ def optimize_image_order(image_dimensions: list, regions: list) -> list:
             if diff < best_diff:
                 best_diff = diff
                 best_img_idx = img_idx
-        
+
         if best_img_idx != -1:
             result[region_idx] = best_img_idx
             used_images.add(best_img_idx)
-    
+
     return result
 
 
@@ -381,18 +379,26 @@ def optimize_image_order(image_dimensions: list, regions: list) -> list:
 # COMFYUI NODE
 # =============================================================================
 
-class DJZ_Offsquare:
+class DJZ_Offsquare_V2:
     """
     Creates optimized image collages from batches of 2-6 images.
     First image appears top-left, last image appears bottom-right with spill effect.
+    V2: Exposes canvas_total_pixels for customizable canvas size.
     """
-    
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "images": ("IMAGE",),
                 "aspect_ratio": (list(ASPECT_RATIOS.keys()), {"default": "1:1"}),
+                "canvas_total_pixels": ("INT", {
+                    "default": 3072,
+                    "min": 512,
+                    "max": 8192,
+                    "step": 64,
+                    "display": "number"
+                }),
                 "border_radius": ("INT", {
                     "default": 0,
                     "min": 0,
@@ -403,7 +409,7 @@ class DJZ_Offsquare:
                 "background_color": ("STRING", {"default": "#000000"}),
             }
         }
-    
+
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("image", "layout_info")
     FUNCTION = "create_collage"
@@ -422,10 +428,10 @@ class DJZ_Offsquare:
         if radius <= 0:
             mask.paste(255, (0, 0, width, height))
             return mask
-        
+
         from PIL import ImageDraw
         draw = ImageDraw.Draw(mask)
-        
+
         # Draw rounded rectangle
         draw.rounded_rectangle(
             [(0, 0), (width - 1, height - 1)],
@@ -435,13 +441,15 @@ class DJZ_Offsquare:
         return mask
 
     def create_collage(self, images: torch.Tensor, aspect_ratio: str,
-                       border_radius: int, background_color: str):
+                       canvas_total_pixels: int, border_radius: int,
+                       background_color: str):
         """
         Main function to create the collage.
 
         Args:
             images: Batch of images as tensor (B, H, W, C)
             aspect_ratio: Selected aspect ratio string
+            canvas_total_pixels: Base dimension for canvas size (e.g. 3072 = 3072x3072 at 1:1)
             border_radius: Corner radius for image regions
             background_color: Hex color for canvas background
 
@@ -450,99 +458,99 @@ class DJZ_Offsquare:
         """
         # Get batch size (number of images)
         batch_size = images.shape[0]
-        
+
         if batch_size < 2:
             raise ValueError("OffSquare requires at least 2 images. Received: {}".format(batch_size))
-        
+
         if batch_size > 6:
-            print(f"[DJZ_Offsquare] Warning: Maximum 6 images supported. Using first 6 of {batch_size}.")
+            print(f"[DJZ_Offsquare_V2] Warning: Maximum 6 images supported. Using first 6 of {batch_size}.")
             images = images[:6]
             batch_size = 6
-        
+
         # Calculate canvas dimensions
         ratio = ASPECT_RATIOS[aspect_ratio]
-        canvas_width, canvas_height = calculate_dimensions(ratio)
-        
+        canvas_width, canvas_height = calculate_dimensions(ratio, canvas_total_pixels)
+
         # Convert tensors to PIL images and get dimensions
         pil_images = []
         image_dimensions = []
-        
+
         for i in range(batch_size):
             # Convert from tensor (H, W, C) with values 0-1 to PIL
             img_np = (images[i].cpu().numpy() * 255).astype(np.uint8)
             pil_img = Image.fromarray(img_np, 'RGB')
             pil_images.append(pil_img)
             image_dimensions.append((pil_img.width, pil_img.height))
-        
+
         # Select layout
         layout = select_optimal_layout(batch_size, image_dimensions)
-        
+
         # Get optimized image order
         image_order = optimize_image_order(image_dimensions, layout["regions"])
-        
+
         # Create canvas
         bg_color = self.hex_to_rgb(background_color)
         canvas = Image.new('RGB', (canvas_width, canvas_height), bg_color)
-        
+
         # Sort regions by z-index for proper layering
         sorted_regions = sorted(
             enumerate(layout["regions"]),
             key=lambda x: x[1]["z"]
         )
-        
+
         # Render each region
         for region_idx, region in sorted_regions:
             img_idx = image_order[region_idx]
             if img_idx < 0 or img_idx >= len(pil_images):
                 continue
-            
+
             pil_img = pil_images[img_idx]
-            
+
             # Calculate region in pixels
             region_x = int(region["x"] * canvas_width)
             region_y = int(region["y"] * canvas_height)
             region_w = int(region["w"] * canvas_width)
             region_h = int(region["h"] * canvas_height)
-            
+
             # Calculate scale to fill region
             scale = calculate_fill_scale(
                 pil_img.width, pil_img.height,
                 region_w, region_h
             )
-            
+
             scaled_w = int(pil_img.width * scale)
             scaled_h = int(pil_img.height * scale)
-            
+
             # Resize image
             scaled_img = pil_img.resize((scaled_w, scaled_h), Image.Resampling.LANCZOS)
-            
+
             # Calculate offset to center in region
             offset_x = (region_w - scaled_w) // 2
             offset_y = (region_h - scaled_h) // 2
-            
+
             # Create region image (crop to region size)
             region_img = Image.new('RGB', (region_w, region_h), bg_color)
             region_img.paste(scaled_img, (offset_x, offset_y))
-            
+
             # Apply rounded corners if needed
             if border_radius > 0:
                 mask = self.create_rounded_mask(region_w, region_h, border_radius)
-                
+
                 # Create a temporary canvas section
                 temp_section = canvas.crop((region_x, region_y, region_x + region_w, region_y + region_h))
-                
+
                 # Composite with mask
                 canvas.paste(region_img, (region_x, region_y), mask)
             else:
                 canvas.paste(region_img, (region_x, region_y))
-        
+
         # Convert back to tensor
         output_np = np.array(canvas).astype(np.float32) / 255.0
         output_tensor = torch.from_numpy(output_np).unsqueeze(0)  # Add batch dimension
-        
+
         # Create layout info string
-        layout_info = f"Layout: {layout['type']} | Images: {batch_size} | Canvas: {canvas_width}x{canvas_height} | Aspect: {aspect_ratio}"
-        
+        layout_info = f"Layout: {layout['type']} | Images: {batch_size} | Canvas: {canvas_width}x{canvas_height} | Aspect: {aspect_ratio} | Base: {canvas_total_pixels}px"
+
         return (output_tensor, layout_info)
 
 
@@ -551,9 +559,9 @@ class DJZ_Offsquare:
 # =============================================================================
 
 NODE_CLASS_MAPPINGS = {
-    "DJZ_Offsquare": DJZ_Offsquare
+    "DJZ_Offsquare_V2": DJZ_Offsquare_V2
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "DJZ_Offsquare": "DJZ Offsquare Collage"
+    "DJZ_Offsquare_V2": "DJZ Offsquare Collage V2"
 }

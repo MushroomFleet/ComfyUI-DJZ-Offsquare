@@ -9,7 +9,13 @@ Author: Drift Johnson
 Repository: https://github.com/MushroomFleet/ComfyUI-DJZ-Offsquare
 """
 
-from .DJZ_Offsquare import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+from .DJZ_Offsquare import NODE_CLASS_MAPPINGS as DJZ_Offsquare_MAPPINGS
+from .DJZ_Offsquare import NODE_DISPLAY_NAME_MAPPINGS as DJZ_Offsquare_DISPLAY
+from .DJZ_Offsquare_V2 import NODE_CLASS_MAPPINGS as DJZ_Offsquare_V2_MAPPINGS
+from .DJZ_Offsquare_V2 import NODE_DISPLAY_NAME_MAPPINGS as DJZ_Offsquare_V2_DISPLAY
+
+NODE_CLASS_MAPPINGS = {**DJZ_Offsquare_MAPPINGS, **DJZ_Offsquare_V2_MAPPINGS}
+NODE_DISPLAY_NAME_MAPPINGS = {**DJZ_Offsquare_DISPLAY, **DJZ_Offsquare_V2_DISPLAY}
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
 
